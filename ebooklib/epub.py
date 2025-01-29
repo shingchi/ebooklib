@@ -481,7 +481,8 @@ class EpubCoverHtml(EpubHtml):
 
         images = tree_root.xpath('//xhtml:img', namespaces={'xhtml': NAMESPACES['XHTML']})
 
-        images[0].set('src', self.image_name)
+        relative_path = zip_path.relpath(self.image_name, zip_path.dirname(self.file_name))
+        images[0].set('src', relative_path)
         images[0].set('alt', self.title)
 
         tree_str = etree.tostring(tree, pretty_print=True, encoding='utf-8', xml_declaration=True)

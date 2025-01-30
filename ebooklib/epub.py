@@ -474,10 +474,29 @@ class EpubCoverHtml(EpubHtml):
           Returns content of this document.
         """
 
-        self.content = self.book.get_template('cover')
-
-        tree = parse_string(super(EpubCoverHtml, self).get_content())
+        tree = parse_string(self.book.get_template('cover'))
         tree_root = tree.getroot()
+
+        tree_root.set('lang', self.lang or self.book.language)
+        tree_root.attrib['{%s}lang' % NAMESPACES['XML']] = self.lang or self.book.language
+
+        head = tree_root.xpath('//xhtml:head', namespaces={'xhtml': NAMESPACES['XHTML']})[0]
+        title = head.find('title')
+
+        if self.title != '':
+            if title is not None:
+                title.text = self.title
+            else:
+                title = etree.SubElement(head, 'title')
+                title.text = self.title
+
+        for lnk in self.links:
+            if lnk.get('type') == 'text/javascript':
+                _lnk = etree.SubElement(head, 'script', lnk)
+                # force <script></script>
+                _lnk.text = ''
+            else:
+                _lnk = etree.SubElement(head, 'link', lnk)
 
         images = tree_root.xpath('//xhtml:img', namespaces={'xhtml': NAMESPACES['XHTML']})
 
@@ -486,6 +505,7 @@ class EpubCoverHtml(EpubHtml):
         images[0].set('alt', self.title)
 
         tree_str = etree.tostring(tree, pretty_print=True, encoding='utf-8', xml_declaration=True)
+        self.content = tree_str
 
         return tree_str
 
@@ -640,23 +660,26 @@ class EpubBook(object):
 
         self.direction = direction
 
-    def set_cover(self, file_name, content, create_page=True):
+    def set_cover(self, image_name, content, html_name='cover.xhtml', create_page=True, css=None):
         """
         Set cover and create cover document if needed.
 
         :Args:
-          - file_name: file name of the cover page
+          - image_name: file name of the cover image item
           - content: Content for the cover image
+          - html_name: file name of the cover page item
           - create_page: Should cover page be defined. Defined as bool value (optional). Default value is True.
         """
 
         # as it is now, it can only be called once
-        c0 = EpubCover(file_name=file_name)
+        c0 = EpubCover(file_name=image_name)
         c0.content = content
         self.add_item(c0)
 
         if create_page:
-            c1 = EpubCoverHtml(image_name=file_name)
+            c1 = EpubCoverHtml(file_name=html_name, image_name=image_name)
+            if css:
+                c1.add_item(css)
             self.add_item(c1)
 
         self.add_metadata(None, 'meta', '', OrderedDict([('name', 'cover'), ('content', 'cover-img')]))
